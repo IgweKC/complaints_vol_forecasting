@@ -2,41 +2,46 @@
   **Objective**: Build a forecasting approach that predicts the daily num 90 days after the final date in the dataset (2025-12-31 to 2026-03-31).
 
 
-
-## Approach
-
-
+  ## Approach
 
 1. **Data cleaning**: I Dropped `centered_7d_mean` (leakage — uses future values t+1..t+3). Reindexed to full daily calendar (43 gap-days filled). Impute missing exogenous variables via forward-fill + median. Interpolate 53 missing target values for lag features only; flag and exclude from training loss.
 
 2. **Feature engineering**: I generated 19 strictly causal features  calendar (dow, month, week-of-year, day-of-month, trend), causal lags (1, 7, 14, 28 days), trailing rolling mean/std (7d, 28d), and exogenous passthrough (staffing, backlog, media, channel mix, bank holidays).
 
 3. **Model**: 
+
 - Base Model: Seasonal Naive (m=7)  
+
 - SARIMAX(1,1,1)(1,1,0,7) with exogenous variables
+
 - LightGBM with quantile loss (q=0.1/0.5/0.9 for point forecast + 80% Prediction Interval).
 
 4. **Evaluation**: Walk-forward backtest, 3 folds × 90-day test windows. Metrics: MAE (primary), RMSE, MASE, sMAPE, pinball loss, empirical PI coverage.
 
-5. **Result**: LightGBM wins with mean MAE ≈ 25.1 complaints/day across folds, beating SARIMAX (25.9) and Seasonal Naive (29.5).
 
+5. **Result**: LightGBM wins with mean MAE ≈ 25.1 complaints/day across folds, beating SARIMAX (25.9) and Seasonal Naive (29.5).
 
 
 ## How to Run
 
-
-
 ```bash
+
 # Clone and set up
+
 git clone https://github.com/IgweKC/complaints_vol_forecasting.git
+
 
 cd complaints_vol_forecasting
 
+
 python -m venv venv
+
 
 # Windows:
 
+
 .\venv\Scripts\activate
+
 
 # macOS/Linux:
 
@@ -44,48 +49,71 @@ python -m venv venv
 
 pip install -r requirements.txt
 
-
-
 # Run the full pipeline (backtest + 90-day forecast)
 
 python scripts/run_forecast.py
 
-
 ```
-
-
 
 **Outputs** are written to `reports/`:
 
 - `forecast_90d.csv` : 90-day daily forecast with 80% prediction intervals
-
 - `backtest_metrics.csv` : per-fold per-model evaluation metrics
-
 - `figures/` : backtest fan chart, residual ACF, day-of-week bias, forecast plot
-
-
 
 Step-by-step naration: `notebooks/forecast.ipynb` walks through EDA, feature engineering, backtest, and forecast with comments.
 
 
+```
+├── README.md
+├── requirements.txt
+├── .gitignore
+├── data/
+│   └── daily_records.csv           # source data
+├── notebooks/
+│   └── forecast.ipynb              # narrative end-to-end
+├── src/complaints_forecast/
+│   ├── __init__.py
+│   ├── io.py                       # load, clean, reindex, impute, leakage drop
+│   ├── features.py                 # calendar, causal lags, trailing rolling stats
+│   ├── splits.py                   # rolling-origin walk-forward splitter
+│   ├── metrics.py                  # MAE, RMSE, MASE, pinball, coverage
+│   ├── models.py                   # SeasonalNaive, SARIMAX, LightGBM
+│   └── forecast.py                 # future frame construction, 90-day forecast
+├── scripts/
+│   └── run_forecast.py             # single entry point
+├── reports/
+│   ├── forecast_90d.csv
+│   ├── backtest_metrics.csv
+│   └── figures/
+└── tests/
+    └── test_basics.py             # leakage, split correctness, metric numerics
+```
 
 
-Stucture:
-complaints_vol_forecasting
-    - data
-        - daily_records.csv          # source data
-    - notebook
-        - 
-    - report (automatically generated)
-    - Scripts
-        - run_forecast.py             # single entry point 
-    - src/complaints_forecast
-        -__init__.py
-        - io.py                       # load, clean, reindex, impute, leakage drop
-        - features.py                 # calendar, causal lags, trailing rolling stats      
-        - splits.py                   # rolling-origin walk-forward splitter
-        - metrics.py                  # MAE, RMSE, MASE, pinball, coverage
-        - models.py                   # SeasonalNaive, SARIMAX, LightGBM
-        - forecast.py                 # future frame construction, 90-day 
-    - requirements.txt
-    - README.md
+### Summarry of What I did
+
+- Identified and removed `centered_7d_mean` as a leakage feature
+- Reindexed to full daily dates (43 gaps filled) and handled missing values with documented imputation policy
+- Engineered 19 strictly causal features across calendar, lag, rolling, and exogenous groups
+- Evaluated 3 models (Seasonal Naive, SARIMAX, LightGBM) via walk-forward backtest with 3 folds × 90 days
+- Selected LightGBM (mean MAE ≈ 25.1 complaints/day) as the winning model
+- Produced a 90-day forecast with 80% prediction intervals
+
+
+### Limitations
+- **MASE > 1**: The models improve on seasonal naive by test-set MAE but not by MASE (due to the in-sample denominator). With more history, the MASE denominator would stabilise.
+
+- **PI under-coverage**: LightGBM's quantile regression PIs achieve ~45-50% coverage instead of the nominal 80%. 
+
+- **Residual autocorrelation**: Ljung-Box test shows significant lag-7 structure in residuals. Hence, given time I would apply a recursive multi-step approach or try a combination of models
+
+- **Exogenous assumptions**: Future values of operational variables are held flat at recent medians. I belive that the actual values (in production) would significantly improve accuracy.
+
+- **Only 3 years of data**: Insufficient to model yearly seasonality or long-term structural changes.
+
+### What I will do given more time
+- Conformal prediction intervals for properly calibrated PIs
+- SARIMAX order selection via a broader AIC grid or auto_arima
+- Ensemble of SARIMAX + LightGBM
+- Recursive LightGBM variant for comparison with the direct approach
