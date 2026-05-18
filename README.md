@@ -93,10 +93,11 @@ Uses Walk-forward backtest, that is, I used the past to predict the feature, not
 - Pinball Loss (q=0.1, q=0.9): Used to evaluate how well the lower and upper prediction interval bounds are calibrated. I consider this quite usful because operationally, range in more interesting (90 to 100 complaints).
 - Coverage (80% Prediction Interval): Measures whether the prediction intervals contain the actual values at the expected frequency. It ensures forecast uncertainty is reliable for planning.
 
-##**Result**: 
+## **Result**: 
 LightGBM wins with mean MAE ≈ 25.1 complaints/day across folds, beating SARIMAX (25.9) and Seasonal Naive (29.5).
 - Produced a 90-day forecast with 80% prediction intervals
 
+![alt text](forecast_90d.png)
 
 ## **validation**
 In time series forecasting, it is important to check if the model can be improved further. To do this, I used **residual Diagnostics**. This checks is there are still signals or partern in the model residue. The presence of such indicate that the model can be improved or another model can provide a better fit. Operationally, this help build stakeholders trust on the process.
