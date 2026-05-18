@@ -83,11 +83,10 @@ Step-by-step naration: `notebooks/forecast.ipynb` walks through EDA, feature eng
 ├── scripts/
 │   └── run_forecast.py             # single entry point
 ├── reports/
-│   ├── forecast_90d.csv
-│   ├── backtest_metrics.csv
-│   └── figures/
-└── tests/
-    └── test_basics.py             # leakage, split correctness, metric numerics
+    ├── forecast_90d.csv
+    ├── backtest_metrics.csv
+    └── figures/
+
 ```
 
 
