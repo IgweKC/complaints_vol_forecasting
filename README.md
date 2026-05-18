@@ -9,7 +9,7 @@
   5. Compare Seasonal Naive, SARIMAX, and LightGBM
   6.  Produce 90-day forecast with the winning model
 
-**Approach**
+# **Approach**
 ## 1. Data Loading, Cleaning & Data Quality Assessment
 
 - **Dropping leakage**: `centered_7d_mean` is rolling mean that uses values from t−3 to t+3, making it a **leakage** feature. This means that at t time, it uses future value (t+1,t+2 and t+3) allow the model to see "the answer". Eventhough this will work in training, it biases the model and will fail in production (where the future value won't be available). Hence `centered_7d_mean` is dropped
@@ -29,7 +29,7 @@
 
 Note: Interpolated values are not observations. Training the model on them, will teach the modelto reproduce my guesses, not the real patterns. Hence the values  are used only to allow for lag/rolling features to exist for the real rows, but never used during training.
 
-2. **EDA**: The EDA revealed:
+## **EDA**: The EDA revealed:
  ![alt text](image.png)
 
 - Clear upward trend: Complaints volume rises steadily over the 3-year period (2023–2025).
@@ -53,7 +53,7 @@ Note: Interpolated values are not observations. Training the model on them, will
   
 **Low-end outlier**: Minimum complaints = 7, P01 = 31. At least one anomalously low day (possibly a recording error or system outage). A model that tolerate outliers would be neccessary. A tree model does. 
 
-3. **and Feature engineering**
+## **Feature engineering**
 I generated 19 strictly causal features  calendar (dow, month, week-of-year, day-of-month, trend), causal lags (1, 7, 14, 28 days), trailing rolling mean/std (7d, 28d), and exogenous passthrough (staffing, backlog, media, channel mix, bank holidays).
 
 All features used only data available at or before time t.
@@ -70,12 +70,11 @@ All features used only data available at or before time t.
 - **Columns**: roll_mean_7, roll_std_7, roll_mean_28, roll_std_28 
     - **Rationale**: replaces the centered_mean as a Local level and volatility but trailing, not centered
 
-4. **Feature Group**: Exogenous variables 
-
+**Feature Group**: Exogenous variables 
 - **Columns**: staffing_level_fte, backlog_days, media_mentions, channel_mix_index, bank_holiday_flag       -   Operational drivers
 
 
-4. **Model**: 
+## **Model**: 
 Based on the above EDA and the feature engineering. I choose model from simple to a more complex one, informaed by the observations in the EDA, lags and correlation
 - Base Model: The observed soasonality suggest that Seasonal Naive should tested with m=7  
 - SARIMAX performs well when there is bith seanality and exogenouse varaibles. Hence I choose SARIMAX(1,1,1)(1,1,0,7) with exogenous variables
@@ -86,18 +85,21 @@ Based on the above EDA and the feature engineering. I choose model from simple t
 **Configuration**: 3 folds × 90-day test windows, stepping backwards from the end. Three folds (not five) because with ~1,068 usable rows, five folds would shrink the earliest training set to a point where SARIMAX becomes unstable.
 
 
-5. **Evaluation**: Uses Walk-forward backtest, that is, I used the past to predict the feature, not random k-fold. Random splits leak future information into training data
+ ## **Evaluation**: 
+Uses Walk-forward backtest, that is, I used the past to predict the feature, not random k-fold. Random splits leak future information into training data
  - MAE (Primary) Chosen: Gives an easily interpretable average forecasting error in complaint units and aligns directly with operational staffing terminology.
   - RMSE:Can easily identify large forecasting mistakes. Uses where, under or over-predictions are operationally more damaging than many small errors.
 - MASE: Included as a scale-independent benchmark to determine whether the model performs better than a simple seasonal naive forecast.
 - Pinball Loss (q=0.1, q=0.9): Used to evaluate how well the lower and upper prediction interval bounds are calibrated. I consider this quite usful because operationally, range in more interesting (90 to 100 complaints).
 - Coverage (80% Prediction Interval): Measures whether the prediction intervals contain the actual values at the expected frequency. It ensures forecast uncertainty is reliable for planning.
 
-6. **Result**: LightGBM wins with mean MAE ≈ 25.1 complaints/day across folds, beating SARIMAX (25.9) and Seasonal Naive (29.5).
+##**Result**: 
+LightGBM wins with mean MAE ≈ 25.1 complaints/day across folds, beating SARIMAX (25.9) and Seasonal Naive (29.5).
 - Produced a 90-day forecast with 80% prediction intervals
 
 
-7 **validation** In time series forecasting, it is important to check if the model can be improved further. To do this, I used **residual Diagnostics**. This checks is there are still signals or partern in the model residue. The presence of such indicate that the model can be improved or another model can provide a better fit. Operationally, this help build stakeholders trust on the process.
+## **validation**
+In time series forecasting, it is important to check if the model can be improved further. To do this, I used **residual Diagnostics**. This checks is there are still signals or partern in the model residue. The presence of such indicate that the model can be improved or another model can provide a better fit. Operationally, this help build stakeholders trust on the process.
 
 In this case, the diagnostics indicate that improvements are required. All output are written to Report/
 ![alt text](image-4.png)
